@@ -9,23 +9,24 @@ import { toast } from "sonner";
 
 const Signup = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { signup } = useAuth();
   const [form, setForm] = useState({ name: "", location: "", email: "", password: "" });
   const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const update = (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const registeredUsers = JSON.parse(localStorage.getItem("registeredUsers") || "[]");
-    if (registeredUsers.includes(form.email)) {
-      toast.error("This email is already registered. Please login instead.");
+    setLoading(true);
+    const { error } = await signup(form.email, form.password, form.name, form.location);
+    setLoading(false);
+    if (error) {
+      toast.error(error);
       return;
     }
-    registeredUsers.push(form.email);
-    localStorage.setItem("registeredUsers", JSON.stringify(registeredUsers));
-    toast.success("Account created! Please login to continue 🌾");
-    navigate("/login", { replace: true });
+    toast.success("Account created! Welcome to Smart Farm! 🌾");
+    navigate("/");
   };
 
   return (
@@ -70,15 +71,15 @@ const Signup = () => {
                 <Lock className="h-4 w-4 text-muted-foreground" /> Password
               </Label>
               <div className="relative">
-                <Input type={showPw ? "text" : "password"} placeholder="Create a password" className="py-5 pr-10 bg-background" value={form.password} onChange={e => update("password", e.target.value)} required />
+                <Input type={showPw ? "text" : "password"} placeholder="Create a password (min 6 chars)" className="py-5 pr-10 bg-background" value={form.password} onChange={e => update("password", e.target.value)} required minLength={6} />
                 <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" onClick={() => setShowPw(!showPw)}>
                   {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
 
-            <Button type="submit" size="lg" className="w-full py-6 font-bold rounded-full text-base gap-2">
-              Create Account <ArrowRight className="h-5 w-5" />
+            <Button type="submit" size="lg" className="w-full py-6 font-bold rounded-full text-base gap-2" disabled={loading}>
+              {loading ? "Creating..." : "Create Account"} <ArrowRight className="h-5 w-5" />
             </Button>
           </form>
 
