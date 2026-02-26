@@ -13,15 +13,17 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const registeredUsers = JSON.parse(localStorage.getItem("registeredUsers") || "[]");
-    if (!registeredUsers.includes(email)) {
-      toast.error("No account found! Please sign up first 🌱");
+    setLoading(true);
+    const { error } = await login(email, password);
+    setLoading(false);
+    if (error) {
+      toast.error(error);
       return;
     }
-    login();
     toast.success("Welcome back, farmer! 🌾");
     navigate("/");
   };
@@ -49,50 +51,28 @@ const Login = () => {
               <Label htmlFor="email" className="text-sm font-bold flex items-center gap-2 mb-1.5">
                 <Mail className="h-4 w-4 text-muted-foreground" /> Email
               </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="farmer@example.com"
-                className="py-5 bg-background"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-              />
+              <Input id="email" type="email" placeholder="farmer@example.com" className="py-5 bg-background" value={email} onChange={e => setEmail(e.target.value)} required />
             </div>
             <div>
               <Label htmlFor="password" className="text-sm font-bold flex items-center gap-2 mb-1.5">
                 <Lock className="h-4 w-4 text-muted-foreground" /> Password
               </Label>
               <div className="relative">
-                <Input
-                  id="password"
-                  type={showPw ? "text" : "password"}
-                  placeholder="Enter your password"
-                  className="py-5 pr-10 bg-background"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                  onClick={() => setShowPw(!showPw)}
-                >
+                <Input id="password" type={showPw ? "text" : "password"} placeholder="Enter your password" className="py-5 pr-10 bg-background" value={password} onChange={e => setPassword(e.target.value)} required />
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" onClick={() => setShowPw(!showPw)}>
                   {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
 
-            <Button type="submit" size="lg" className="w-full py-6 font-bold rounded-full text-base gap-2">
-              Login <ArrowRight className="h-5 w-5" />
+            <Button type="submit" size="lg" className="w-full py-6 font-bold rounded-full text-base gap-2" disabled={loading}>
+              {loading ? "Logging in..." : "Login"} <ArrowRight className="h-5 w-5" />
             </Button>
           </form>
 
           <p className="text-center text-sm text-muted-foreground mt-6">
             Don't have an account?{" "}
-            <Link to="/signup" className="text-primary font-bold hover:underline">
-              Sign Up 🌱
-            </Link>
+            <Link to="/signup" className="text-primary font-bold hover:underline">Sign Up 🌱</Link>
           </p>
         </div>
       </div>

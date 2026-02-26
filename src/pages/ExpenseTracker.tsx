@@ -7,13 +7,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Navbar from "@/components/Navbar";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Expense {
   id: string;
   category: string;
   description: string;
   amount: number;
-  type: "expense" | "income";
+  type: string;
   date: string;
 }
 
@@ -22,49 +24,54 @@ const incomeCategories = ["Crop Sale", "Government Subsidy", "Insurance Claim", 
 
 const ExpenseTracker = () => {
   const navigate = useNavigate();
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    const saved = localStorage.getItem("farm_expenses");
-    return saved ? JSON.parse(saved) : [
-      { id: "1", category: "Seeds", description: "Wheat seeds - 50kg", amount: 2500, type: "expense", date: "2026-02-20" },
-      { id: "2", category: "Fertilizer", description: "DAP 50kg", amount: 1800, type: "expense", date: "2026-02-18" },
-      { id: "3", category: "Labor", description: "Field preparation - 3 workers", amount: 3000, type: "expense", date: "2026-02-15" },
-      { id: "4", category: "Crop Sale", description: "Rice - 10 quintals", amount: 21830, type: "income", date: "2026-02-10" },
-      { id: "5", category: "Government Subsidy", description: "PM-Kisan installment", amount: 2000, type: "income", date: "2026-02-01" },
-    ];
-  });
-
+  const { user } = useAuth();
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [formType, setFormType] = useState<"expense" | "income">("expense");
   const [form, setForm] = useState({ category: "", description: "", amount: "", date: new Date().toISOString().split("T")[0] });
 
   useEffect(() => {
-    localStorage.setItem("farm_expenses", JSON.stringify(expenses));
-  }, [expenses]);
+    if (!user) return;
+    const fetchExpenses = async () => {
+      const { data, error } = await supabase
+        .from("expenses")
+        .select("*")
+        .order("date", { ascending: false });
+      if (error) { toast.error("Failed to load expenses"); return; }
+      setExpenses(data.map(e => ({ ...e, amount: Number(e.amount) })));
+      setLoading(false);
+    };
+    fetchExpenses();
+  }, [user]);
 
   const totalExpenses = expenses.filter(e => e.type === "expense").reduce((sum, e) => sum + e.amount, 0);
   const totalIncome = expenses.filter(e => e.type === "income").reduce((sum, e) => sum + e.amount, 0);
   const profit = totalIncome - totalExpenses;
 
-  const handleAdd = () => {
-    if (!form.category || !form.description || !form.amount) {
+  const handleAdd = async () => {
+    if (!form.category || !form.description || !form.amount || !user) {
       toast.error("Please fill all fields");
       return;
     }
-    const entry: Expense = {
-      id: Date.now().toString(),
+    const { data, error } = await supabase.from("expenses").insert({
+      user_id: user.id,
       category: form.category,
       description: form.description,
       amount: parseFloat(form.amount),
       type: formType,
       date: form.date,
-    };
-    setExpenses([entry, ...expenses]);
+    }).select().single();
+    if (error) { toast.error("Failed to add entry"); return; }
+    setExpenses([{ ...data, amount: Number(data.amount) }, ...expenses]);
     setForm({ category: "", description: "", amount: "", date: new Date().toISOString().split("T")[0] });
     setShowForm(false);
     toast.success(`${formType === "expense" ? "Expense" : "Income"} added! 📝`);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from("expenses").delete().eq("id", id);
+    if (error) { toast.error("Failed to delete"); return; }
     setExpenses(expenses.filter(e => e.id !== id));
     toast.success("Entry deleted");
   };
@@ -73,6 +80,8 @@ const ExpenseTracker = () => {
     name: cat,
     total: expenses.filter(e => e.type === "expense" && e.category === cat).reduce((s, e) => s + e.amount, 0),
   })).filter(c => c.total > 0).sort((a, b) => b.total - a.total);
+
+  if (loading) return <div className="min-h-screen bg-background"><Navbar /><div className="flex items-center justify-center py-20"><p className="text-muted-foreground">Loading expenses...</p></div></div>;
 
   return (
     <div className="min-h-screen bg-background">
@@ -190,29 +199,33 @@ const ExpenseTracker = () => {
           <div className="p-4 border-b">
             <h2 className="text-sm font-bold">📋 Recent Transactions</h2>
           </div>
-          <div className="divide-y">
-            {expenses.map((e) => (
-              <div key={e.id} className="flex items-center justify-between p-4 hover:bg-muted/20 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${e.type === "expense" ? "bg-destructive/10" : "bg-success/10"}`}>
-                    {e.type === "expense" ? <TrendingDown className="h-4 w-4 text-destructive" /> : <TrendingUp className="h-4 w-4 text-success" />}
+          {expenses.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground text-sm">No transactions yet. Add your first expense or income!</div>
+          ) : (
+            <div className="divide-y">
+              {expenses.map((e) => (
+                <div key={e.id} className="flex items-center justify-between p-4 hover:bg-muted/20 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${e.type === "expense" ? "bg-destructive/10" : "bg-success/10"}`}>
+                      {e.type === "expense" ? <TrendingDown className="h-4 w-4 text-destructive" /> : <TrendingUp className="h-4 w-4 text-success" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold">{e.description}</p>
+                      <p className="text-[10px] text-muted-foreground">{e.category} · {e.date}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-bold">{e.description}</p>
-                    <p className="text-[10px] text-muted-foreground">{e.category} · {e.date}</p>
+                  <div className="flex items-center gap-3">
+                    <p className={`text-sm font-extrabold ${e.type === "expense" ? "text-destructive" : "text-success"}`}>
+                      {e.type === "expense" ? "-" : "+"}₹{e.amount.toLocaleString()}
+                    </p>
+                    <button onClick={() => handleDelete(e.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <p className={`text-sm font-extrabold ${e.type === "expense" ? "text-destructive" : "text-success"}`}>
-                    {e.type === "expense" ? "-" : "+"}₹{e.amount.toLocaleString()}
-                  </p>
-                  <button onClick={() => handleDelete(e.id)} className="text-muted-foreground hover:text-destructive transition-colors">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <footer className="text-center py-6 mt-4">

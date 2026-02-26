@@ -1,30 +1,73 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { User, Session } from "@supabase/supabase-js";
 
 interface AuthContextType {
   isLoggedIn: boolean;
-  login: () => void;
-  logout: () => void;
+  user: User | null;
+  session: Session | null;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<{ error: string | null }>;
+  signup: (email: string, password: string, fullName: string, location: string) => Promise<{ error: string | null }>;
+  logout: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType>({ isLoggedIn: false, login: () => {}, logout: () => {} });
+const AuthContext = createContext<AuthContextType>({
+  isLoggedIn: false,
+  user: null,
+  session: null,
+  loading: true,
+  login: async () => ({ error: null }),
+  signup: async () => ({ error: null }),
+  logout: async () => {},
+});
 
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem("farmer_logged_in") === "true");
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = () => {
-    localStorage.setItem("farmer_logged_in", "true");
-    setIsLoggedIn(true);
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    return { error: error?.message ?? null };
   };
 
-  const logout = () => {
-    localStorage.removeItem("farmer_logged_in");
-    setIsLoggedIn(false);
+  const signup = async (email: string, password: string, fullName: string, location: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName, location },
+        emailRedirectTo: window.location.origin,
+      },
+    });
+    return { error: error?.message ?? null };
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, login, logout }}>
+    <AuthContext.Provider value={{ isLoggedIn: !!session, user, session, loading, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );
