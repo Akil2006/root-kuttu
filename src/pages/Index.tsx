@@ -9,18 +9,21 @@ const allCards = [
     circle: "icon-circle-green",
     title: "Low Crop Yield",
     desc: "Not getting enough harvest from your land? Get expert advice on the right crop.",
+    link: "/advisory/low-yield",
   },
   {
     icon: Droplets,
     circle: "icon-circle-blue",
     title: "Water Wastage",
     desc: "Using too much or too little water? Learn the perfect irrigation schedule.",
+    link: "/advisory/water-wastage",
   },
   {
     icon: FlaskConical,
     circle: "icon-circle-orange",
     title: "High Fertilizer Cost",
     desc: "Spending too much on fertilizers? Know exactly what your soil needs.",
+    link: "/advisory/fertilizer-cost",
   },
   {
     icon: CloudRain,

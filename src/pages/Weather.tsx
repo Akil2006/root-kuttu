@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, CloudRain, Sun, Cloud, CloudSnow, CloudLightning,
-  Droplets, Wind, Thermometer, Gauge, Sunrise, Sunset
+  Droplets, Wind, Thermometer, Gauge, Sunrise, Sunset,
+  AlertTriangle, Info, AlertCircle
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 
@@ -13,8 +14,15 @@ interface WeatherData {
 interface DailyForecast {
   date: string; maxTemp: number; minTemp: number; weatherCode: number;
   precipSum: number; windMax: number; sunrise: string; sunset: string;
+  precipProb: number;
 }
 interface HourlyForecast { time: string; temp: number; weatherCode: number; precipitation: number; }
+
+interface WeatherAlert {
+  type: "warning" | "info" | "danger";
+  title: string;
+  message: string;
+}
 
 const getWeatherInfo = (code: number) => {
   if (code === 0) return { label: "Clear Sky", icon: Sun, emoji: "☀️" };
@@ -35,29 +43,79 @@ const Weather = () => {
   const [hourly, setHourly] = useState<HourlyForecast[]>([]);
   const [loading, setLoading] = useState(true);
   const [locationName, setLocationName] = useState("Your Location");
+  const [alerts, setAlerts] = useState<WeatherAlert[]>([]);
 
   useEffect(() => {
     const fetchWeather = async (lat: number, lon: number) => {
       try {
         const res = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,surface_pressure,is_day&hourly=temperature_2m,weather_code,precipitation&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,sunrise,sunset&timezone=auto&forecast_days=7`
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,surface_pressure,is_day&hourly=temperature_2m,weather_code,precipitation&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,sunrise,sunset,precipitation_probability_max&timezone=auto&forecast_days=7`
         );
         const data = await res.json();
-        setCurrent({
+
+        const currentData: WeatherData = {
           temperature: data.current.temperature_2m, humidity: data.current.relative_humidity_2m,
           windSpeed: data.current.wind_speed_10m, weatherCode: data.current.weather_code,
           apparentTemp: data.current.apparent_temperature, precipitation: data.current.precipitation,
           pressure: data.current.surface_pressure, visibility: 10, uvIndex: 5, isDay: data.current.is_day,
-        });
-        setDaily(data.daily.time.map((d: string, i: number) => ({
+        };
+        setCurrent(currentData);
+
+        const dailyData: DailyForecast[] = data.daily.time.map((d: string, i: number) => ({
           date: d, maxTemp: data.daily.temperature_2m_max[i], minTemp: data.daily.temperature_2m_min[i],
           weatherCode: data.daily.weather_code[i], precipSum: data.daily.precipitation_sum[i],
           windMax: data.daily.wind_speed_10m_max[i], sunrise: data.daily.sunrise[i], sunset: data.daily.sunset[i],
-        })));
+          precipProb: data.daily.precipitation_probability_max[i],
+        }));
+        setDaily(dailyData);
+
         const now = new Date();
         setHourly(data.hourly.time.map((t: string, i: number) => ({
           time: t, temp: data.hourly.temperature_2m[i], weatherCode: data.hourly.weather_code[i], precipitation: data.hourly.precipitation[i],
         })).filter((h: HourlyForecast) => new Date(h.time) >= now).slice(0, 24));
+
+        // Generate Alerts
+        const newAlerts: WeatherAlert[] = [];
+
+        // 1. Tomorrow's Forecast Alert
+        if (dailyData.length > 1) {
+          const tomorrow = dailyData[1];
+          newAlerts.push({
+            type: "info",
+            title: "Tomorrow's Forecast",
+            message: `Rain probability: ${tomorrow.precipProb}%, Temperature: ${Math.round(tomorrow.maxTemp)}°C`,
+          });
+
+          // 2. Extreme Rain Alert
+          if (tomorrow.precipSum > 5 || tomorrow.precipProb > 60) {
+            newAlerts.push({
+              type: "warning",
+              title: "Heavy Rain Expected",
+              message: "Heavy rain expected tomorrow morning – avoid irrigation today.",
+            });
+          }
+
+          // 3. Heatwave Alert
+          if (tomorrow.maxTemp > 38) {
+            newAlerts.push({
+              type: "danger",
+              title: "Heatwave Alert",
+              message: "Extreme heat expected! Ensure proper hydration for yourself and crops.",
+            });
+          }
+        }
+
+        // 4. Current Extreme Weather
+        if (currentData.temperature > 40) {
+          newAlerts.push({
+            type: "danger",
+            title: "Extreme Heat",
+            message: "Local heatwave active. Avoid outdoor work during peak hours.",
+          });
+        }
+
+        setAlerts(newAlerts);
+
       } catch (err) { console.error("Weather fetch failed:", err); } finally { setLoading(false); }
     };
 
@@ -98,6 +156,38 @@ const Weather = () => {
           <h1 className="text-2xl font-extrabold">Live Weather</h1>
           <p className="text-muted-foreground text-sm mt-1">📍 {locationName}</p>
         </div>
+
+        {/* Alerts Section */}
+        {alerts.length > 0 && (
+          <div className="space-y-3 mb-6 animate-fade-down">
+            {alerts.map((alert, i) => (
+              <div
+                key={i}
+                className={`flex items-start gap-4 p-4 rounded-xl border-2 shadow-sm ${alert.type === "danger" ? "bg-destructive/10 border-destructive animate-pulse-subtle" :
+                  alert.type === "warning" ? "bg-warning/10 border-warning" :
+                    "bg-info/10 border-info"
+                  }`}
+              >
+                <div className="mt-0.5">
+                  {alert.type === "danger" && <AlertCircle className="h-5 w-5 text-destructive" />}
+                  {alert.type === "warning" && <AlertTriangle className="h-5 w-5 text-warning" />}
+                  {alert.type === "info" && <Info className="h-5 w-5 text-info" />}
+                </div>
+                <div>
+                  <h3 className={`font-bold text-sm ${alert.type === "danger" ? "text-destructive" :
+                    alert.type === "warning" ? "text-warning-foreground" :
+                      "text-info-foreground"
+                    }`}>
+                    {alert.title}
+                  </h3>
+                  <p className="text-xs mt-0.5 text-muted-foreground leading-relaxed font-medium">
+                    {alert.message}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Current */}
         <div className="bg-card rounded-xl p-6 shadow-sm border mb-6 animate-fade-up">
@@ -188,6 +278,7 @@ const Weather = () => {
             {current.humidity > 70 && <li className="flex gap-2 text-muted-foreground"><Droplets className="h-4 w-4 text-info shrink-0 mt-0.5" />💧 High humidity — watch for fungal diseases.</li>}
             {current.windSpeed > 20 && <li className="flex gap-2 text-muted-foreground"><Wind className="h-4 w-4 text-icon-teal shrink-0 mt-0.5" />💨 Strong winds — avoid spraying pesticides today.</li>}
             {current.precipitation > 0 && <li className="flex gap-2 text-muted-foreground"><CloudRain className="h-4 w-4 text-icon-purple shrink-0 mt-0.5" />🌧️ Rain detected — skip irrigation today.</li>}
+            {daily.length > 1 && daily[1].precipProb > 50 && <li className="flex gap-2 text-muted-foreground"><CloudRain className="h-4 w-4 text-info shrink-0 mt-0.5" />🌧️ High chance of rain tomorrow ({daily[1].precipProb}%) — consider postponing irrigation.</li>}
             <li className="flex gap-2 text-muted-foreground"><Sun className="h-4 w-4 text-warning shrink-0 mt-0.5" />Check the 7-day forecast before sowing or harvesting.</li>
           </ul>
         </div>

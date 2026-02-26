@@ -43,31 +43,43 @@ const CommunityForum = () => {
   const [showNewPost, setShowNewPost] = useState(false);
 
   const fetchPosts = async () => {
-    const { data: postsData, error } = await supabase
-      .from("community_posts")
-      .select("*, profiles(full_name, location), post_replies(*, profiles(full_name)), post_likes(user_id)")
-      .order("created_at", { ascending: false });
+    try {
+      setLoading(true);
+      const { data: postsData, error } = await supabase
+        .from("community_posts")
+        .select("*, profiles(full_name, location), post_replies(*, profiles(full_name)), post_likes(user_id)")
+        .order("created_at", { ascending: false });
 
-    if (error) { toast.error("Failed to load posts"); return; }
+      if (error) {
+        console.error("Supabase error fetching posts:", error);
+        toast.error("Failed to load posts");
+        setLoading(false);
+        return;
+      }
 
-    const mapped: Post[] = (postsData || []).map((p: any) => ({
-      id: p.id,
-      author: p.profiles?.full_name || "Farmer",
-      location: p.profiles?.location || "",
-      content: p.content,
-      category: p.category,
-      likes: p.likes_count,
-      liked: (p.post_likes || []).some((l: any) => l.user_id === user?.id),
-      timestamp: new Date(p.created_at).toLocaleDateString(),
-      replies: (p.post_replies || []).map((r: any) => ({
-        id: r.id,
-        author: r.profiles?.full_name || "Farmer",
-        content: r.content,
-        timestamp: new Date(r.created_at).toLocaleDateString(),
-      })),
-    }));
-    setPosts(mapped);
-    setLoading(false);
+      const mapped: Post[] = (postsData || []).map((p: any) => ({
+        id: p.id,
+        author: p.profiles?.full_name || "Farmer",
+        location: p.profiles?.location || "",
+        content: p.content,
+        category: p.category,
+        likes: p.likes_count,
+        liked: (p.post_likes || []).some((l: any) => l.user_id === user?.id),
+        timestamp: new Date(p.created_at).toLocaleDateString(),
+        replies: (p.post_replies || []).map((r: any) => ({
+          id: r.id,
+          author: r.profiles?.full_name || "Farmer",
+          content: r.content,
+          timestamp: new Date(r.created_at).toLocaleDateString(),
+        })),
+      }));
+      setPosts(mapped);
+    } catch (err) {
+      console.error("Unexpected error fetching posts:", err);
+      toast.error("An unexpected error occurred");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchPosts(); }, [user]);
