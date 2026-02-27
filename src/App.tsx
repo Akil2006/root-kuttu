@@ -14,6 +14,8 @@ import Weather from "./pages/Weather";
 import CropDisease from "./pages/CropDisease";
 import CommunityForum from "./pages/CommunityForum";
 import ExpenseTracker from "./pages/ExpenseTracker";
+import { lazy, Suspense } from "react";
+const StoreLocator = lazy(() => import("./pages/StoreLocator"));
 import AdvisoryDetail from "./pages/AdvisoryDetail";
 import NotFound from "./pages/NotFound";
 
@@ -43,6 +45,7 @@ const AppRoutes = () => (
     <Route path="/crop-disease" element={<ProtectedRoute><CropDisease /></ProtectedRoute>} />
     <Route path="/community" element={<ProtectedRoute><CommunityForum /></ProtectedRoute>} />
     <Route path="/expenses" element={<ProtectedRoute><ExpenseTracker /></ProtectedRoute>} />
+    <Route path="/store-locator" element={<ProtectedRoute><Suspense fallback={<div>Loading Map...</div>}><StoreLocator /></Suspense></ProtectedRoute>} />
     <Route path="/advisory/:slug" element={<ProtectedRoute><AdvisoryDetail /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
   </Routes>

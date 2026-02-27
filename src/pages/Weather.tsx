@@ -3,9 +3,12 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, CloudRain, Sun, Cloud, CloudSnow, CloudLightning,
   Droplets, Wind, Thermometer, Gauge, Sunrise, Sunset,
-  AlertTriangle, Info, AlertCircle
+  AlertTriangle, Info, AlertCircle, Mail, MailCheck, Loader2
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface WeatherData {
   temperature: number; humidity: number; windSpeed: number; weatherCode: number;
@@ -38,6 +41,7 @@ const getWeatherInfo = (code: number) => {
 
 const Weather = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [current, setCurrent] = useState<WeatherData | null>(null);
   const [daily, setDaily] = useState<DailyForecast[]>([]);
   const [hourly, setHourly] = useState<HourlyForecast[]>([]);
@@ -153,7 +157,9 @@ const Weather = () => {
 
         <div className="text-center mb-6">
           <div className="icon-circle icon-circle-red mx-auto mb-3"><CloudRain className="h-7 w-7" /></div>
-          <h1 className="text-2xl font-extrabold">Live Weather</h1>
+          <h1 className="text-2xl font-extrabold flex items-center gap-2 justify-center">
+            Live Weather
+          </h1>
           <p className="text-muted-foreground text-sm mt-1">📍 {locationName}</p>
         </div>
 

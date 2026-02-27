@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Sprout, Droplets, FlaskConical, CloudRain, ArrowRight, Camera, Users, Wallet } from "lucide-react";
+import { Sprout, Droplets, FlaskConical, CloudRain, ArrowRight, Camera, Users, Wallet, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
 
@@ -59,6 +59,13 @@ const allCards = [
     title: "Expense Tracker",
     desc: "Track your farm costs and calculate your profit/loss.",
     link: "/expenses",
+  },
+  {
+    icon: MapPin,
+    circle: "icon-circle-teal",
+    title: "Store Locator",
+    desc: "Find the nearest seed and fertilizer shops using GPS.",
+    link: "/store-locator",
   },
 ];
 
